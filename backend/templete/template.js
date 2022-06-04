@@ -1,10 +1,15 @@
-const { date } = require('@hapi/joi')
+const { date, string } = require('@hapi/joi')
 const mongoose=require('mongoose')
 const episode=new mongoose.Schema({
     article:{
         type:String
     },
     subtitle:{
+        type:String
+    }
+})
+const Likeid=new mongoose.Schema({
+    id:{
         type:String
     }
 })
@@ -49,11 +54,28 @@ const userpost=new mongoose.Schema({
     type:mongoose.SchemaTypes.ObjectId,
     ref:'Usertemplate'
     },
-    
-    
+    likes:[
+       Likeid
+    ],
+    love:[
+        Likeid
+     ],
+    laugh:[
+        Likeid
+     ],
+    cry:[
+        Likeid
+     ],
+    dislikes:[
+        Likeid
+     ],
+    view:[
+        Likeid
+    ]
         
     
 })
+
 
 const Usertemplate=new mongoose.Schema({
 username:{
@@ -97,7 +119,8 @@ subscribers:{
 },
 Detail:{
     type:String
-}
+},
+
 })
 
 module.exports.Usertemplate=mongoose.model('user',Usertemplate)
