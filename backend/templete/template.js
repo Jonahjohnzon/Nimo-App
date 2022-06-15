@@ -148,6 +148,9 @@ profileimage:{
 blocked:{
 type:Boolean
 },
+wordc:{
+    type:String
+    },
 date:{
     type:Date,
     default:()=>Date.now().toString(),

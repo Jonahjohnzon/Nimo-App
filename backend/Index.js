@@ -6,13 +6,11 @@ const {Postrouter}=require('./routes/routes')
 const mongoose=require('mongoose')
 const cors=require('cors')
 require('dotenv').config()
-
 port=process.env.PORT||4000
-
 mongoose.connect(process.env.MONGO_DB, {useNewUrlParser: true, useUnifiedTopology: true},()=>{
     console.log('mongo connected')
 })
-app.use('/uploads',express.static('uploads'))
+
 app.use(cors())
 app.use(express.json())
 app.use("/users",Signuprouter)

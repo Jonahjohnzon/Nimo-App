@@ -28,16 +28,23 @@ signatureVersion:'v4'
      return uploadURL
 
 }
-async function deleteurl(){
-    const uploadParams={
+async function deleteurl(imagename){
+    const uploadParam={
         Bucket:name,
         Key:imagename,
     }
 
-     const deleteURL=await s3.deleteObject('deleteObject',uploadParams)
-     return deleteURL
+     await s3.deleteObject(uploadParam,(err,data)=>{
+        if(err){
+            return err
+        }
+        if(data){
+            return data
+        }
+     })
 
 }
 module.exports.generateurl=generateurl
+module.exports.deleteurl=deleteurl
 
 
