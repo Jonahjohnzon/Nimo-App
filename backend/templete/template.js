@@ -26,6 +26,24 @@ const comment=new mongoose.Schema({
     },
     userid:{
         type:String
+    },
+    likes:[
+        Likeid
+     ],
+     drag:{
+         type:String
+     },
+     image:{
+         type:String
+     },
+     drag:{
+         type:String
+     },
+     replyname:{
+         type:String
+     },
+     replyid:{
+        type:String
     }
 })
 const userpost=new mongoose.Schema({
@@ -44,6 +62,9 @@ const userpost=new mongoose.Schema({
     },
     
     category:{
+        type:String
+    }  ,
+    level:{
         type:String
     }  ,
     episode:[episode] ,
@@ -71,11 +92,33 @@ const userpost=new mongoose.Schema({
      ],
     view:[
         Likeid
-    ]
+    ],
+    allowcomment:{
+        type:Boolean
+    }
         
     
 })
 
+const Newnotice=new mongoose.Schema({
+    new:{
+        type:String
+    },
+    from:{
+        type:String
+    },
+    to:{
+        type:String
+    }
+    ,
+    date:{
+        type:Date,
+        default:Date.now
+    },
+    userpostid:{
+        type:String
+    }
+})
 
 const Usertemplate=new mongoose.Schema({
 username:{
@@ -102,6 +145,9 @@ quote:{
 profileimage:{
     type:String
 },
+blocked:{
+type:Boolean
+},
 date:{
     type:Date,
     default:()=>Date.now().toString(),
@@ -120,6 +166,12 @@ subscribers:{
 Detail:{
     type:String
 },
+notification:{
+    messages:[Newnotice],
+    alert:{
+        type:Boolean
+    }
+}
 
 })
 

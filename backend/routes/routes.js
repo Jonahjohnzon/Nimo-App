@@ -7,29 +7,9 @@ const {LoginValidation}=require('../Validation/Validation')
 const jwt=require('jsonwebtoken')
 const multer=require('multer')
 const verifyJwt = require('../Validation/Verify')
+const {generateurl}=require('../S3')
 
 
-const storage=multer.diskStorage({
-  destination:(req,file,cb)=>{
-    cb(null,'./uploads/')
-  },
-  filename:(req,file,cb)=>{
-     cb(null,Date.now() + file.originalname)
-  }
-})
-const fileFliter=(req,file,cb)=>{
-if(file.mimetype === 'image.jpeg'||'image.png'||'image.jpg' ){
-cb(null,true)
-}
-else{
-  cb(new Error('Wrong Image Type'),false)
-}
-
-}
-const upload=multer({storage:storage,limits:{
-  fileSize:1024 * 20000
-},
-fileFilter:fileFliter})
 const Signuprouter=router.post('/signup',async(req,res)=>{
   const salt=await bcrypt.genSalt(10);
   const hashpassword=await bcrypt.hash(req.body.password,salt)
@@ -58,14 +38,14 @@ const Signuprouter=router.post('/signup',async(req,res)=>{
      })
       await userdata.save()
      try{
-        res.json('SignUp Sucessful')
+       return res.json('SignUp Sucessful')
      }
      catch(err){
-        res.json(err)}}}
+      return  res.json(err)}}}
 })
 const Loginrouter=router.post("/login",async(req,res)=>{
   const {error}=LoginValidation(req.body)
-  if(error){return res.json(error.details[0].message)}
+if(error){return res.json(error.details[0].message)}
   else{
   const email=req.body.email
   const emails=email.toLowerCase()
@@ -75,17 +55,15 @@ const Loginrouter=router.post("/login",async(req,res)=>{
     const validpass=await bcrypt.compare(req.body.password,emailexist.password)
     if(!validpass)return res.json('Invalid password ')
     else{
-      const token = jwt.sign({_id: emailexist._id},process.env.TOKEN_SECRET)
+      const token =jwt.sign({_id: emailexist._id},process.env.TOKEN_SECRET)
       const data=emailexist
       res.json({auth:true,token:token,data:data})
     }
     }}
-  
 })
 
 
-const Postrouter=router.post('/post',verifyJwt,async(req,res)=>{
-  console.log(req.body)
+const Postrouter=router.post('/post',async(req,res)=>{
   const data=await new Usertemplate({
    Detail:'Post',
    posts:{
@@ -96,46 +74,50 @@ const Postrouter=router.post('/post',verifyJwt,async(req,res)=>{
     subtitle:req.body.subtitle,
     article:req.body.article
    },
+   level:req.body.level,
    category:req.body.category,
    type:req.body.type,
+   allowcomment:req.body.allowcomment
    },
    userids:req.body.userids
   })
    try{const post=await data.save()
-       res.json(post)}
+      return res.json(post)}
    catch(err){
-     res.json('post failed')
+    return res.json('post failed')
    }
 
 
 })
+router.get('/images',async(req,res)=>{
+ const url=await generateurl()
+ return res.send({url})
+
+})
 
 
-router.put('/post/image/:id',verifyJwt,upload.single("file"),async(req,res)=>{
+router.put('/post/image/:id',async(req,res)=>{
   const id=req.params.id
-  const file=req.file.path
-  const files=file.replace("\\","/")
+   const files=req.body.image
+   console.log(files)
   Usertemplate.updateOne({"posts._id":id},{$set:{image:files}},{
     upsert:false,
     strict:false
 },(err,doc)=>{
     if(err){
-      res.send(err)
+    return  res.send(err)
     }
     else{
-      res.send(doc)
+     return res.send(doc)
     }
   })
 })
-router.put('/post/edit/:id',verifyJwt,upload.single("file"),async(req,res)=>{
+router.put('/post/edit/:id',verifyJwt,async(req,res)=>{
   const id=req.params.id
-  const file=req.file?.path
-  console.log(req.file)
+  const file=req.body.image
   if(file){
-  const files=file.replace("\\","/")
-  const profileimage=files
   Usertemplate.findOneAndUpdate({Detail:'Post',"posts._id":id},{$set:{
-       image:profileimage,
+       image:file,
       'posts.title':req.body?.title,
       'posts.post':req.body?.post,
       'posts.category':req.body?.category,
@@ -146,10 +128,10 @@ router.put('/post/edit/:id',verifyJwt,upload.single("file"),async(req,res)=>{
     strict:false
 },(err,doc)=>{
     if(err){
-      res.send(err)
+     return res.send(err)
     }
     else{
-      res.send(doc)
+     return res.send(doc)
     }
   })}
   else{
@@ -161,31 +143,31 @@ router.put('/post/edit/:id',verifyJwt,upload.single("file"),async(req,res)=>{
     'posts.category':req.body?.category,
     'posts.type':req.body?.type
     }}).then((doc)=>{
-      res.json(doc)
-    } ).catch(err=>{res.json('err')})}
+    return  res.json(doc)
+    } ).catch(err=>{return res.json('err')})}
 })
-router.put('/update/:id',verifyJwt,upload.single("file"),async(req,res)=>{
+router.put('/update/:id',verifyJwt,async(req,res)=>{
   const bios=req.body?.bio
   const quote=req.body?.quote
   const username=req.body?.username
-  const file=req.file?.path
+  const file=req.body?.profileimage
+
   if(file){
-  const files=file.replace("\\","/")
-  const profileimage=files
+  const profileimage=file
  
    Usertemplate.findOneAndUpdate({Detail:'Userpass',_id:req.params.id},{
      $set:{bio:bios,quote,username,profileimage}
    },{ 
       strict:false}).then((doc)=>{
-     res.json(doc)
-   }).catch(err=>{res.json('err')})}
+    return res.json(doc)
+   }).catch(err=>{ return res.json('err')})}
    else{
     Usertemplate.findOneAndUpdate({Detail:'Userpass',_id:req.params.id},{
       $set:{bio:bios,quote,username}
     },{ 
        strict:false}).then((doc)=>{
-      res.json(doc)
-    }).catch(err=>{res.json('err')})
+     return res.json(doc)
+    }).catch(err=>{return res.json('err')})
    }
   
 })
@@ -193,121 +175,117 @@ router.put('/post/comment/:id',verifyJwt,(req,res)=>{
   const commentsection=req.body.word
   const user=req.body.user
   const userid=req.body.userid
-  const edit=req.body?.edit
-  if(edit){
-    console.log(edit)
-    Usertemplate.findOneAndUpdate({Detail:'Post',"posts._id":req.params.id,'comment._id':req.body.id},{
-     '$set':{'comment.$.word':commentsection,}        
-    }).then((doc)=>{
-        res.json(doc)
-      }).then((d)=>{
-      console.log(d)
-    }).catch(err=>{res.json('err')})
-  }
-  else{
+  const drag=req.body?.drag
+  const replyname=req.body?.replyname
+  const replyid=req.body?.replyid
+  const image=req.body?.image
+
+
   Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
   $push:{comment:{word:commentsection,
-                  user:user,
-                  userid:userid,
+                  user,
+                  userid,
+                  drag,
+                  replyid,
+                  replyname,
+                  image
                  }}
 },{ upsert:false,
    strict:false}).then((doc)=>{
-    res.json(doc)
-  }).catch(err=>{res.json('err')})}
+   return res.json(doc)
+  }).catch(err=>{return res.json('err')})
  
 })
 router.put('/post/like/:id',verifyJwt,async(req,res)=>{
-  const iduser=await Usertemplate.findOne({$or:[{Detail:'Post','posts.likes.id':req.body.id},{Detail:'Post','posts.love.id':req.body.id},{Detail:'Post','posts.laugh.id':req.body.id},{Detail:'Post','posts.cry.id':req.body.id},{Detail:'Post','posts.dislikes.id':req.body.id}]})
+  const iduser=await Usertemplate.findOne({$or:[{'posts.likes.id':req.body.id},{'posts.love.id':req.body.id},{'posts.laugh.id':req.body.id},{'posts.cry.id':req.body.id},{'posts.dislikes.id':req.body.id}]})
   if(iduser){
     const likess=await Usertemplate.findOne({Detail:'Post','posts.likes.id':req.body.id})
     if(likess){
-      Usertemplate.findOneAndUpdate({Detail:'Post','posts.likes.id':req.body.id},{
-        $pull:{'posts.likes':{id:req.body.id}}
-        
+     await Usertemplate.findOneAndUpdate({Detail:'Post','posts.likes.id':req.body.id},{
+        $pull:{'posts.likes':{id:req.body.id}} 
       }).then((r)=>{
-        res.json('clear')
-      }).catch(err=>{res.json('err')})
+       return res.json('clear')
+      }).catch(err=>{return res.json('err')})
     }
     const loves=await Usertemplate.findOne({Detail:'Post','posts.love.id':req.body.id})
     if(loves){
-      Usertemplate.findOneAndUpdate({Detail:'Post','posts.love.id':req.body.id},{
+      await Usertemplate.findOneAndUpdate({Detail:'Post','posts.love.id':req.body.id},{
         $pull:{'posts.love':{id:req.body.id}}
         
       }).then((r)=>{
-        res.json('clear')
-      }).catch(err=>{res.json('err')})
+      return res.json('clear')
+      }).catch(err=>{return res.json('err')})
     }
     const laughs=await Usertemplate.findOne({Detail:'Post','posts.laugh.id':req.body.id})
     if(laughs){
-      Usertemplate.findOneAndUpdate({Detail:'Post','posts.laugh.id':req.body.id},{
+      await Usertemplate.findOneAndUpdate({Detail:'Post','posts.laugh.id':req.body.id},{
         $pull:{'posts.laugh':{id:req.body.id}}
         
       }).then((r)=>{
-        res.json('clear')
-      }).catch(err=>{res.json('err')})
+        return res.json('clear')
+      }).catch(err=>{return res.json('err')})
     }
     const dislike=await Usertemplate.findOne({Detail:'Post','posts.dislikes.id':req.body.id})
     if(dislike){
-      Usertemplate.findOneAndUpdate({Detail:'Post','posts.dislikes.id':req.body.id},{
+     await Usertemplate.findOneAndUpdate({Detail:'Post','posts.dislikes.id':req.body.id},{
         $pull:{'posts.dislikes':{id:req.body.id}}
         
       }).then((r)=>{
-        res.send('clear')
-      }).catch(err=>{res.json('err')})
+       return res.json('clear')
+      }).catch(err=>{return res.json('err')})
     }
     const crys=await Usertemplate.findOne({Detail:'Post','posts.cry.id':req.body.id})
     if(crys){
-      Usertemplate.findOneAndUpdate({Detail:'Post','posts.cry.id':req.body.id},{
+     await Usertemplate.findOneAndUpdate({Detail:'Post','posts.cry.id':req.body.id},{
         $pull:{'posts.cry':{id:req.body.id}}
         
       }).then((r)=>{
-        res.json('clear')
-        console.log(r)
-      }).catch(err=>{res.json('err')})
+       return res.json('clear')
+      }).catch(err=>{return res.json('err')})
     }
     
   }
   else{
     if(req.body.values=='likes')
     {
-      Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
+      await Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
         $push:{'posts.likes':{id:req.body.id}}
       },{ upsert:false,
          strict:false}).then((doc)=>{
-          res.json('likes')
-        }).catch(err=>{res.json('err')})
+         return res.json('likes')
+        }).catch(err=>{return res.json('err')})
     }
     if(req.body.values=='love')
     {
-      Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
+     await Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
         $push:{'posts.love':{id:req.body.id}}
       },{ upsert:false,
          strict:false}).then((doc)=>{
-          res.json('love')}).catch(err=>{res.json('err')})
+         return res.json('love')}).catch(err=>{return res.json('err')})
     }
     if(req.body.values=='laugh')
     {
-      Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
+      await Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
         $push:{'posts.laugh':{id:req.body.id}}
       },{ upsert:false,
          strict:false}).then((doc)=>{
-          res.json('laugh')}).catch(err=>{res.json('err')})
+         return  res.json('laugh')}).catch(err=>{return res.json('err')})
     }
     if(req.body.values=='cry')
     {
-      Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
+     await Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
         $push:{'posts.cry':{id:req.body.id}}
       },{ upsert:false,
          strict:false}).then((doc)=>{
-          res.json('cry')}).catch(err=>{res.json('err')})
+         return res.json('cry')}).catch(err=>{return res.json('err')})
     }
     if(req.body.values=='dislikes')
     {
-      Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
+     await Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
         $push:{'posts.dislikes':{id:req.body.id}}
       },{ upsert:false,
          strict:false}).then((doc)=>{
-          res.send('dislikes')}).catch(err=>{res.json('err')})
+         return res.json('dislikes')}).catch(err=>{return res.json('err')})
     }
   }
  
@@ -315,16 +293,16 @@ router.put('/post/like/:id',verifyJwt,async(req,res)=>{
 router.put('/post/view/:id',verifyJwt,async(req,res)=>{
   const view=await Usertemplate.findOne({Detail:'Post',"posts._id":req.params.id,'posts.view.id':req.body.id})
     if(view){
-      res.json('viewed')
+     return res.json('viewed')
     }
     else{
       Usertemplate.findOneAndUpdate({Detail:"Post","posts._id":req.params.id},{
         $push:{'posts.view':{id:req.body.id}}
       },{ upsert:false,
          strict:false}).then(()=>{
-           res.json('done')
+          return  res.json('done')
          }).catch(()=>{
-           res.json('err')
+          return   res.json('err')
          })
     }
   
@@ -332,111 +310,130 @@ router.put('/post/view/:id',verifyJwt,async(req,res)=>{
 router.get('/post/getcomment/:id',verifyJwt,async(req,res)=>{
   const data=await Usertemplate.findOne({Detail:"Post","posts._id":req.params.id})
   try{
-    res.json(data)
+    return  res.json(data)
   }
   catch{
-    res.json('notfound')
+    return   res.json('notfound')
+  }
+})
+router.get('/post/deletecomment/:id',verifyJwt,async(req,res)=>{
+  console.log(req.params.id)
+  const data=await Usertemplate.findOneAndUpdate({"comment._id":req.params.id},{$pull:{comment:{_id:req.params.id}}})
+  try{
+    return   res.json(data)
+  }
+  catch{
+    return  res.json('notfound')
   }
 })
 
-router.get('/data',verifyJwt,async(req,res)=>{
+router.get('/data',async(req,res)=>{
   const data=await Usertemplate.find({"Detail":"Post"}).populate('userids')
    try{
-     res.json(data)
+    return  res.json(data)
    }
    catch{
-     res.json('notfound')
+    return  res.json('notfound')
    }
 })
 router.get('/get/like/:post/:id',verifyJwt,async(req,res)=>{
   const iduser=await Usertemplate.findOne({Detail:'Post',"posts._id":req.params.post,'posts.likes.id':req.params.id})
  try{ if(iduser){
-    res.json('likes')
+  return  res.json('likes')
   }
   else{
     const iduse=await Usertemplate.findOne({Detail:'Post',"posts._id":req.params.post,'posts.love.id':req.params.id})
     if(iduse){
-      res.json('love')
+      return  res.json('love')
     }
     else{
       const idus=await Usertemplate.findOne({Detail:'Post',"posts._id":req.params.post,'posts.cry.id':req.params.id})
       if(idus){
-        res.json('cry')
+        return   res.json('cry')
       }
       else{
         const idu=await Usertemplate.findOne({Detail:'Post',"posts._id":req.params.post,'posts.laugh.id':req.params.id})
         if(idu){
-          res.json('laugh')
+          return  res.json('laugh')
         }
         else{
           const idn=await Usertemplate.findOne({Detail:'Post',"posts._id":req.params.post,'posts.dislikes.id':req.params.id})
           if(idn){
-            res.json('dislikes')
+            return   res.json('dislikes')
           }
           else{
-            res.json('clear')
+            return   res.json('clear')
           }
         }
       }
     }
   }}catch{
-    res.send('error')
+    return  res.send('error')
   }
 })
 router.get('/post/id/:id',verifyJwt,async(req,res)=>{
   const data=await Usertemplate.findOne({"Detail":"Post","posts._id":req.params.id}).populate('userids')
    try{
-     res.json(data)
+    return   res.json(data)
    }
    catch{
-     res.json('notfound')
+    return   res.json('notfound')
    }
 })
 router.get('/post/delete/:id',verifyJwt,async(req,res)=>{
   const data=await Usertemplate.findOneAndRemove({"Detail":"Post","posts._id":req.params.id})
    try{
      res.json('delete')
-     console.log('delete')
+     return  console.log('delete')
    }
    catch{
-     res.json('notfound')
+    return  res.json('notfound')
    }
 })
 router.get('/datanew/:id',verifyJwt,async(req,res)=>{
   const data=await Usertemplate.find({"Detail":"Post","posts.category":req.params.id}).populate('userids')
    try{
-     res.json(data)
+    return  res.json(data)
    }
    catch{
-     res.json('notfound')
+    return   res.json('notfound')
+   }
+})
+router.get('/datamain/:id',verifyJwt,async(req,res)=>{
+  const data=await Usertemplate.find({"Detail":"Post","posts.level":req.params.id}).populate('userids')
+   try{
+    return  res.json(data)
+   }
+   catch{
+    return  res.json('notfound')
    }
 })
 router.get('/data/:id',verifyJwt,async(req,res)=>{
   const id=req.params.id
   const data=await Usertemplate.find({"Detail":"Post","userids":id}).populate('userids')
    try{
-     res.json(data)
+    return  res.json(data)
    }
    catch{
-     res.json('notfound')
+    return  res.json('notfound')
    }
 })
-router.get('/profile/:id',verifyJwt,async(req,res)=>{
-  const data=await Usertemplate.find({"DetaiL":"userpass","_id":req.params.id}).populate('userids')
+router.get('/profile/:id',async(req,res)=>{
+  const data=await Usertemplate.find({"DetaiL":"Userpass","_id":req.params.id})
    try{
-     res.json(data)
+    return  res.json(data)
    }
    catch{
-     res.json('notfound')
+    return  res.json('notfound')
    }
 })
-router.get('/profile/auto/:id',verifyJwt,async(req,res)=>{
-  const data=await Usertemplate.find({"DetaiL":"userpass","_id":req.params.id}).populate('userids')
+router.get('/profile/auto/:id',async(req,res)=>{
+  const data=await Usertemplate.findOne({"Detail":"Userpass","_id":req.params.id})
    try{
-     res.json({auth:true,data:data})
+    return  res.json({auth:true,data:data})
    }
    catch{
-     res.json('notfound')
+    return  res.json('notfound')
    }
 })
 router.put('/post/newsub/:id/',verifyJwt,(req,res)=>{
@@ -451,9 +448,9 @@ router.put('/post/newsub/:id/',verifyJwt,(req,res)=>{
     }}
 },{ upsert:true,
    strict:false}).then((doc)=>{
-    res.json(doc)
+    return  res.json(doc)
   }).catch(()=>{
-    res.json('error')
+    return  res.json('error')
   })
 
 })
@@ -466,12 +463,45 @@ router.put('/post/newupdate/:id',verifyJwt,(req,res)=>{
       'posts.episode.$.subtitle':req.body.subtitle
     }
   }).then((doc)=>{
-    res.json(doc)
+    return  res.json(doc)
   } ).catch(()=>{
-    res.json('error')
+    return  res.json('error')
   })
 
 })
+
+router.put('/post/notice/:id',(req,res)=>{
+  console.log(req.body)
+  Usertemplate.findOneAndUpdate({"Detail":"Userpass","_id":req.params.id},{
+    $push:{
+      'notification.messages':{new:req.body.new,
+                                from:req.body.from,
+                                to:req.body.to,
+                              userpostid:req.body.userpostid}
+    }
+  },{ upsert:false,
+    strict:false}).then((doc)=>{
+      return  res.json(doc)
+  } ).catch((e)=>{
+    return   res.json(e)
+  })
+
+})
+router.put('/post/noticealert/:id',(req,res)=>{
+  console.log(req.body.new)
+  Usertemplate.findOneAndUpdate({"Detail":"Userpass","_id":req.params.id},{
+    $set:{
+      'notification.alert':req.body.set
+    }
+  },{ upsert:false,
+    strict:false}).then((doc)=>{
+      return  res.json(doc)
+  } ).catch((e)=>{
+    return  res.json(e)
+  })
+
+})
+
 
 module.exports.Signuprouter=Signuprouter
 module.exports.Loginrouter=Loginrouter
